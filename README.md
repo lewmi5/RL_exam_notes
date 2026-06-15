@@ -11,8 +11,8 @@ contents, LaTeX-typeset equations).
 |------|------------|
 | [answers.md](answers.md) | The answers — one section per topic, with step-by-step formula explanations. |
 | [questions.md](questions.md) | The exam questions, used to insert exact question text into the PDF. |
-| [generate_pdf.py](generate_pdf.py) | Build script: `answers.md` → `answers.pdf`. |
-| [answers.pdf](answers.pdf) | The generated PDF (regenerate with the script). |
+| [generate_pdf.py](generate_pdf.py) | Build script: `answers.md` → `rl-exam-answers.pdf`. |
+| [rl-exam-answers.pdf](rl-exam-answers.pdf) | The generated PDF (regenerate with the script). |
 | `eq_svg/` | Cache of rendered equations (one SVG per formula). Safe to delete; it will be rebuilt. |
 
 ## Building the PDF

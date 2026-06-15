@@ -1,7 +1,7 @@
 # Python dependencies for generate_pdf.py  (RL exam answers -> PDF).
 #
 # Install:   pip install -r requirements.txt
-# Then run:  python generate_pdf.py            # answers.md -> answers.pdf
+# Then run:  python generate_pdf.py            # answers.md -> rl-exam-answers.pdf
 #
 # Alternatively, `uv run generate_pdf.py` reads the inline PEP 723 metadata
 # at the top of the script and needs no manual install.

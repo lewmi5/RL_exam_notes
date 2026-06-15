@@ -14,7 +14,7 @@ question "pills", equation boxes, tables, table-of-contents entry, and the
 running page header — so the document is easy to navigate and learn from.
 
 Usage:
-    uv run generate_pdf.py                 # answers.md -> answers.pdf
+    uv run generate_pdf.py                 # answers.md -> rl-exam-answers.pdf
     uv run generate_pdf.py in.md out.pdf   # custom input/output
 """
 from __future__ import annotations
@@ -428,7 +428,7 @@ def chapter_page_css(chapters) -> str:
 
 def main() -> int:
     src = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / "answers.md"
-    out = Path(sys.argv[2]) if len(sys.argv) > 2 else HERE / "answers.pdf"
+    out = Path(sys.argv[2]) if len(sys.argv) > 2 else HERE / "rl-exam-answers.pdf"
 
     if not src.exists():
         print(f"error: input file not found: {src}", file=sys.stderr)
