@@ -31,6 +31,21 @@ rewards from time t:
 
 $$G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots = \sum_{k\ge 0} \gamma^k R_{t+k+1}$$
 
+**Reading it term by term.**
+
+- G<sub>t</sub> — the **return** from time t: the quantity we ultimately want to
+  maximize, looking only *forward* from t.
+- R<sub>t+1</sub> — the reward that arrives one step *after* t (the first
+  consequence of the action taken at t); R<sub>t+2</sub> the next, and so on.
+- γ ∈ [0,1] — the **discount factor**. The weight γ<sup>k</sup> shrinks a reward
+  that arrives k steps later, so near rewards matter more than distant ones.
+- The compact sum Σ<sub>k≥0</sub> γ<sup>k</sup>R<sub>t+k+1</sub> just collects
+  every future reward, each scaled by how far away it is.
+
+*Intuition:* γ near 0 makes the agent **myopic** (it cares only about the next
+reward); γ near 1 makes it **far-sighted**. γ < 1 also guarantees the infinite
+sum stays finite.
+
 **Policy (π).** A policy maps states to actions. It can be *deterministic*
 a = π(s), or *stochastic* π(a | s) = probability of choosing a in s. The policy
 is what the agent actually controls and learns.
@@ -39,6 +54,22 @@ is what the agent actually controls and learns.
 policy, by measuring expected return:
 
 $$V^\pi(s) = \mathbb{E}_\pi\!\left[\, G_t \mid S_t = s \,\right] \qquad Q^\pi(s,a) = \mathbb{E}_\pi\!\left[\, G_t \mid S_t = s,\, A_t = a \,\right]$$
+
+**Reading it term by term.**
+
+- 𝔼<sub>π</sub>[ · ] — an **average** taken assuming actions are drawn from
+  policy π and states evolve under the environment's dynamics. Because the
+  future is random, value is an *expected* (mean) return, not a single number.
+- G<sub>t</sub> — the return defined just above.
+- "| S<sub>t</sub> = s" — read "**given** we are in state s at time t".
+- V<sup>π</sup>(s) averages the return over all the ways an episode can unfold
+  *starting from s and acting with π*.
+- Q<sup>π</sup>(s,a) is the same average, but the **first action is pinned to a**
+  ("| S<sub>t</sub>=s, A<sub>t</sub>=a"); only *after* that first step do we
+  follow π.
+
+*Intuition:* V scores a **state**; Q scores a **state plus a committed first
+move**. Their sole difference is whether that first action is fixed in advance.
 
 **Reward** is the immediate signal; **value** is the long-term expected return.
 A key principle (the *reward hypothesis*) is that any goal can be encoded as the
@@ -104,6 +135,17 @@ They are two sides of the same coin and are linked in **both** directions.
 
 $$\pi'(s) = \arg\max_a Q^\pi(s,a)$$
 
+**Reading it term by term.**
+
+- π'(s) — the action the **improved** policy takes in state s.
+- arg max<sub>a</sub> — "the action a that makes the following quantity the
+  largest" (returns the *action*, not the value).
+- Q<sup>π</sup>(s,a) — value of taking a in s and then following the old π.
+
+*Intuition:* in every state, switch to whichever action the current value
+function rates highest. The policy-improvement theorem guarantees this can only
+make the policy better (or leave it unchanged).
+
 The *policy improvement theorem* guarantees V<sup>π′</sup> ≥ V<sup>π</sup>.
 Alternating evaluation and improvement (**generalized policy iteration**)
 converges to the **optimal** policy π\* and value V\*. At the optimum the policy
@@ -121,6 +163,22 @@ They are related by:
 
 $$V^\pi(s) = \sum_a \pi(a\mid s)\, Q^\pi(s,a) \qquad Q^\pi(s,a) = \sum_{s'} P(s'\mid s,a)\big[\, R + \gamma V^\pi(s') \,\big]$$
 
+**Reading it term by term.**
+
+*Left (V from Q):*
+- Σ<sub>a</sub> π(a∣s) Q<sup>π</sup>(s,a) — weight each action's value by how
+  often π chooses it, then sum. Averaging the action out of Q turns it back
+  into the state value V.
+
+*Right (Q from V):*
+- Σ<sub>s'</sub> P(s'∣s,a) — average over the next states the dynamics can
+  produce after taking a in s.
+- R + γV<sup>π</sup>(s') — the immediate reward plus the discounted value of
+  wherever we land.
+
+*Intuition:* V and Q are two views of the same thing. **Average Q over actions →
+V**; **push V one step forward through the model → Q**.
+
 **Why Q matters:** to act greedily from V you need the model
 (argmax<sub>a</sub> Σ P(s′|s,a)[R+γV(s′)]), but from Q you can act greedily
 *model-free*: π(s) = argmax<sub>a</sub> Q(s,a). That is why control algorithms
@@ -135,13 +193,63 @@ immediate reward plus the discounted value of the successor.
 
 $$V^\pi(s) = \sum_a \pi(a\mid s) \sum_{s'} P(s'\mid s,a)\big[\, R(s,a,s') + \gamma V^\pi(s') \,\big]$$
 
+**Reading it term by term.**
+
+- Outer Σ<sub>a</sub> π(a∣s) — average over the actions π might take in s.
+- Inner Σ<sub>s'</sub> P(s'∣s,a) — average over the next states that action can
+  lead to.
+- R(s,a,s') + γV<sup>π</sup>(s') — one step's reward, plus the discounted value
+  of the successor state.
+
+*Intuition:* "value now = average over (my action, the environment's response)
+of (reward now + discounted value next)." It is just the return definition
+written **recursively** — one step made explicit, all later steps folded into
+V<sup>π</sup>(s'). Because there is no max, this equation is **linear** in the
+unknown values and can be solved directly.
+
 $$Q^\pi(s,a) = \sum_{s'} P(s'\mid s,a)\Big[\, R + \gamma \sum_{a'} \pi(a'\mid s')\, Q^\pi(s',a') \,\Big]$$
+
+**Reading it term by term.**
+
+- Action a is already fixed, so we only average over next states:
+  Σ<sub>s'</sub> P(s'∣s,a).
+- R — immediate reward; then γ × the *value of the next state*.
+- That next-state value is itself Σ<sub>a'</sub> π(a'∣s') Q<sup>π</sup>(s',a') —
+  Q averaged over the next action **as chosen by π**.
+
+*Intuition:* same recursion as for V, but anchored at a state-action pair. The
+next action a' is averaged under π — that "follow π afterwards" averaging is
+exactly what makes this an **expectation** (on-policy) equation rather than an
+optimality one.
 
 **Bellman *optimality* equations** (for the optimal policy):
 
 $$V^*(s) = \max_a \sum_{s'} P(s'\mid s,a)\big[\, R + \gamma V^*(s') \,\big]$$
 
+**Reading it term by term.**
+
+- The only change from the expectation equation: the action average
+  Σ<sub>a</sub> π(a∣s) is replaced by **max<sub>a</sub>** — instead of averaging
+  over what π does, take the *best* action.
+- Σ<sub>s'</sub> P(s'∣s,a)[ R + γV<sup>*</sup>(s') ] — the value of committing to
+  action a (expected reward + discounted optimal value next).
+
+*Intuition:* the optimal value of a state equals the value of its single best
+action. The **max** is what makes this equation **nonlinear**, so it has no
+direct linear solve — it is solved by iteration (value/policy iteration).
+
 $$Q^*(s,a) = \sum_{s'} P(s'\mid s,a)\big[\, R + \gamma \max_{a'} Q^*(s',a') \,\big]$$
+
+**Reading it term by term.**
+
+- a is fixed, so average over next states: Σ<sub>s'</sub> P(s'∣s,a).
+- R + γ max<sub>a'</sub> Q<sup>*</sup>(s',a') — take a now, then assume we act
+  **optimally** from the next state onward (that is the inner max).
+
+*Intuition:* "do a now, behave optimally forever after." Because the max sits on
+the *next* action and the value is indexed by (s,a), you can act greedily with
+**no model** — just take arg max<sub>a</sub> Q<sup>*</sup>(s,a). This is precisely
+why control methods learn Q rather than V.
 
 **How many are there?** Four canonical equations: expectation for V and Q, and
 optimality for V and Q. (Equivalently: two *kinds* — expectation and optimality —
@@ -164,6 +272,18 @@ the policy stops changing:
    computed value:
 
 $$\pi'(s) \leftarrow \arg\max_a \sum_{s'} P(s'\mid s,a)\big[\, R + \gamma V^\pi(s') \,\big]$$
+
+**Reading it term by term.**
+
+- For each state s, score every candidate action a by its **one-step
+  lookahead** Σ<sub>s'</sub> P(s'∣s,a)[ R + γV<sup>π</sup>(s') ] — this quantity
+  is exactly Q<sup>π</sup>(s,a).
+- arg max<sub>a</sub> picks the highest-scoring action; the arrow ← assigns it as
+  the new policy's choice in s.
+
+*Intuition:* "look one step ahead using the freshly computed V<sup>π</sup>, then
+act greedily." Note this lookahead **needs the model P**; if instead we had
+Q<sup>π</sup>, we could pick arg max<sub>a</sub> Q<sup>π</sup>(s,a) model-free.
 
 Repeat: π → V<sup>π</sup> → π′ → V<sup>π′</sup> → … Because each improvement step
 produces a policy that is no worse (policy improvement theorem) and there are
@@ -220,10 +340,39 @@ differ in *what target* they use to update.
 
 $$V(S_t) \leftarrow V(S_t) + \alpha\big[\, G_t - V(S_t) \,\big]$$
 
+**Reading it term by term.**
+
+- V(S<sub>t</sub>) — current estimate for the visited state (the thing we update).
+- G<sub>t</sub> — the **actual return**, obtained by running the episode to the
+  end and summing discounted rewards.
+- [ G<sub>t</sub> − V(S<sub>t</sub>) ] — the **error**: how far the estimate was
+  from what really happened.
+- α ∈ (0,1] — **step size**; move a fraction α of the way toward G<sub>t</sub>.
+- ← — "becomes": new estimate = old + α·error.
+
+*Intuition:* once the true return is known, nudge the estimate toward it. The
+target G<sub>t</sub> is a genuine sample of the return, so the update is
+**unbiased** — but you must wait for the episode to end and G<sub>t</sub> is
+**noisy** (high variance).
+
 - **Temporal-Difference (TD(0)):** updates after **one step** toward a
   **bootstrapped** target that uses the current estimate of the next state:
 
 $$V(S_t) \leftarrow V(S_t) + \alpha\big[\, R_{t+1} + \gamma V(S_{t+1}) - V(S_t) \,\big]$$
+
+**Reading it term by term.**
+
+- R<sub>t+1</sub> + γV(S<sub>t+1</sub>) — the **target**: one real reward plus our
+  *current estimate* of the next state's value. Using an estimate inside the
+  target is called **bootstrapping**.
+- [ target − V(S<sub>t</sub>) ] — the **TD error** δ<sub>t</sub>: the surprise
+  between the old prediction and this one-step-improved guess.
+- α — step size; ← — "becomes".
+
+*Intuition:* don't wait for G<sub>t</sub> — take a single step and trust the
+existing estimate for everything after. This updates **online** with **low
+variance**, but it is **biased** while V is still inaccurate (the target leans on
+a wrong estimate).
 
 The bracket is the **TD error** δ<sub>t</sub>.
 
@@ -247,6 +396,17 @@ two endpoints of the spectrum unified by TD(λ).
 
 $$G_t^{(n)} = R_{t+1} + \gamma R_{t+2} + \cdots + \gamma^{n-1} R_{t+n} + \gamma^n V(S_{t+n})$$
 
+**Reading it term by term.**
+
+- First n terms (R<sub>t+1</sub> … γ<sup>n−1</sup>R<sub>t+n</sub>) — the *actual*
+  discounted rewards collected over n real steps.
+- γ<sup>n</sup> V(S<sub>t+n</sub>) — the **bootstrap**: after n real rewards, fall
+  back on the value estimate for everything beyond.
+
+*Intuition:* a dial between TD and MC. n = 1 gives TD(0) (one reward + bootstrap);
+n = ∞ gives Monte-Carlo (all real rewards, no bootstrap). Larger n means **less
+bias** (more real data in the target) but **more variance**.
+
 n = 1 gives TD(0); n = ∞ gives Monte-Carlo. n controls the **bias–variance
 trade-off**: larger n → less bias, more variance.
 
@@ -255,12 +415,37 @@ weighted average* of all n-step returns — the **λ-return**:
 
 $$G_t^\lambda = (1-\lambda)\sum_{n\ge 1} \lambda^{n-1} G_t^{(n)}, \qquad \lambda \in [0,1]$$
 
+**Reading it term by term.**
+
+- Instead of picking one n, **blend all** n-step returns G<sub>t</sub><sup>(n)</sup>.
+- λ<sup>n−1</sup> — the weight on the n-step return; longer horizons receive
+  geometrically smaller weight.
+- (1−λ) — a normalizer so the weights sum to 1 (a proper weighted average).
+
+*Intuition:* a single number λ controls the whole TD↔MC spectrum. λ = 0 puts all
+weight on the 1-step return (⇒ TD(0)); λ = 1 puts all weight on the full return
+(⇒ Monte-Carlo); in between it smoothly averages every horizon.
+
 λ = 0 reduces to TD(0); λ = 1 reduces to Monte-Carlo. TD(λ) is implemented
 online and efficiently using **eligibility traces**: a trace e(s) marks how
 recently/frequently each state was visited, and every state is updated by
 δ<sub>t</sub>·e(s):
 
 $$e_t(s) = \gamma\lambda\, e_{t-1}(s) + \mathbf{1}[S_t = s], \qquad V(s) \leftarrow V(s) + \alpha\, \delta_t\, e_t(s)$$
+
+**Reading it term by term.**
+
+- e<sub>t</sub>(s) — the **eligibility trace** of state s: a short-term memory of
+  how recently and how often s was visited.
+- γλ e<sub>t−1</sub>(s) — **decay** the previous trace by γλ each step, so older
+  visits fade.
+- **1**[S<sub>t</sub> = s] — add 1 whenever s is the state just visited (a "bump").
+- V(s) ← V(s) + α δ<sub>t</sub> e<sub>t</sub>(s) — apply the current TD error
+  δ<sub>t</sub> to **every** state, scaled by its trace.
+
+*Intuition:* one TD error is spread **backward** over all recently-visited
+states, each credited in proportion to its trace. This realizes the λ-return
+**online**, in a single pass, without waiting for the episode to finish.
 
 This gives a smooth interpolation between TD and MC and propagates credit
 backward over many steps in a single online pass.
@@ -274,6 +459,18 @@ tuple it uses: (S, A, R, S′, A′).
 Update rule:
 
 $$Q(S_t, A_t) \leftarrow Q(S_t, A_t) + \alpha\big[\, R_{t+1} + \gamma Q(S_{t+1}, A_{t+1}) - Q(S_t, A_t) \,\big]$$
+
+**Reading it term by term.**
+
+- Same shape as the TD(0) update, but for **action-values** Q(S,A).
+- Target R<sub>t+1</sub> + γQ(S<sub>t+1</sub>, A<sub>t+1</sub>) uses
+  A<sub>t+1</sub>, the action **actually taken next** by the behavior policy —
+  the final "A" in the tuple (S, A, R, S′, A′).
+- The bracket is the TD error; α is the step size.
+
+*Intuition:* the target evaluates the policy the agent is **really following**,
+exploratory moves included — that is what makes SARSA **on-policy**. Because the
+cost of exploration shows up in the values, it learns cautious, "safe" behavior.
 
 Pseudocode:
 
@@ -299,6 +496,19 @@ generate data.
 Update rule:
 
 $$Q(S_t, A_t) \leftarrow Q(S_t, A_t) + \alpha\big[\, R_{t+1} + \gamma \max_{a'} Q(S_{t+1}, a') - Q(S_t, A_t) \,\big]$$
+
+**Reading it term by term.**
+
+- Identical to SARSA **except** the next-action term is
+  max<sub>a'</sub> Q(S<sub>t+1</sub>, a') instead of
+  Q(S<sub>t+1</sub>, A<sub>t+1</sub>).
+- max<sub>a'</sub> — assume the **greedy** (best) next action, no matter what the
+  behavior policy actually did.
+
+*Intuition:* the target describes the **optimal** policy even though the data may
+come from an exploratory one — that is what makes Q-learning **off-policy**. It
+learns Q<sup>*</sup> directly and ignores exploratory mistakes, so it prefers the
+"risky but optimal" path that SARSA shies away from.
 
 The key difference from SARSA is the **max** in the target: the bootstrap uses
 the *greedy* next action, not the action actually taken. So the behavior policy
@@ -347,6 +557,22 @@ estimate and a **target**.
 The general update is:
 
 $$w \leftarrow w + \alpha\big[\, \text{target} - \hat v(S_t; w) \,\big]\, \nabla_w \hat v(S_t; w)$$
+
+**Reading it term by term.**
+
+- w — the **parameters** of the approximator (linear feature weights, or all the
+  weights of a neural net).
+- v̂(S<sub>t</sub>; w) — the approximator's **predicted** value for S<sub>t</sub>.
+- target — the value we wish the prediction matched (G<sub>t</sub> for MC,
+  R<sub>t+1</sub>+γv̂(S<sub>t+1</sub>) for TD).
+- [ target − v̂ ] — the prediction **error**.
+- ∇<sub>w</sub> v̂(S<sub>t</sub>; w) — the **gradient**: the direction in weight
+  space that most increases the prediction at S<sub>t</sub>.
+- α — step size.
+
+*Intuition:* nudge the weights so v̂(S<sub>t</sub>) moves toward the target —
+"error × which way to push each weight." The tabular update is the special case
+where the gradient is 1 for the visited state and 0 everywhere else.
 
 - **MC with function approximation:** target = the actual return G<sub>t</sub>.
   This is a true stochastic-gradient step on 𝔼[(G − v̂)²]; it is **unbiased** and
@@ -399,12 +625,40 @@ form by least squares instead of incremental SGD — far more sample-efficient.
 
 $$w = \Big( \sum_t \phi(S_t)\,\phi(S_t)^\top \Big)^{-1} \sum_t \phi(S_t)\, G_t$$
 
+**Reading it term by term.**
+
+- φ(S<sub>t</sub>) — the **feature vector** of state S<sub>t</sub> (length d);
+  v̂(s) = φ(s)<sup>⊤</sup>w.
+- φ(S<sub>t</sub>)φ(S<sub>t</sub>)<sup>⊤</sup> — an outer product (a d×d matrix);
+  summed over the data it is the (unnormalized) **feature covariance**.
+- Σ<sub>t</sub> φ(S<sub>t</sub>) G<sub>t</sub> — features correlated with the
+  observed returns.
+- (Σ φφ<sup>⊤</sup>)<sup>−1</sup>(Σ φ G<sub>t</sub>) — the **ordinary
+  least-squares** solution.
+
+*Intuition:* this is just linear regression of returns G<sub>t</sub> on features
+φ, solved in **closed form** — no learning rate, uses the whole batch at once.
+
   Uses the unbiased MC return as target.
 
 - **LSTD (Least-Squares Temporal-Difference):** set the expected TD update to
   zero. The TD fixed point is:
 
 $$w = A^{-1} b, \qquad A = \sum_t \phi(S_t)\big(\phi(S_t) - \gamma\phi(S_{t+1})\big)^\top, \qquad b = \sum_t \phi(S_t)\, R_{t+1}$$
+
+**Reading it term by term.**
+
+- φ(S<sub>t</sub>) − γφ(S<sub>t+1</sub>) — the **feature temporal difference**
+  (current feature minus discounted next feature).
+- A = Σ φ(S<sub>t</sub>)(φ(S<sub>t</sub>) − γφ(S<sub>t+1</sub>))<sup>⊤</sup> — a
+  d×d matrix pairing each feature with that TD feature.
+- b = Σ φ(S<sub>t</sub>) R<sub>t+1</sub> — features paired with immediate rewards.
+- w = A<sup>−1</sup>b — the **TD fixed point**, in closed form.
+
+*Intuition:* the batch version of TD(0). Rather than regressing on full returns
+(LSMC), it solves directly for the weights at which the average TD error,
+projected onto the features, is **zero**. No step size; cost is O(d²)–O(d³) from
+forming and inverting A.
 
   This directly computes the TD solution from a batch of data, no step-size
   tuning, using all samples efficiently.
@@ -422,6 +676,22 @@ high-dimensional inputs (Atari from raw pixels) using a deep CNN
 Q(s, a; θ) and learns by minimizing the TD error:
 
 $$L(\theta) = \mathbb{E}_{(s,a,r,s')\sim D}\Big[ \big( r + \gamma \max_{a'} Q(s',a';\theta^-) - Q(s,a;\theta) \big)^2 \Big]$$
+
+**Reading it term by term.**
+
+- θ — weights of the **online** Q-network being trained; θ<sup>−</sup> — weights
+  of a periodically-frozen copy, the **target network**.
+- (s,a,r,s') ∼ D — sample a past transition from the **replay buffer** D.
+- r + γ max<sub>a'</sub> Q(s',a'; θ<sup>−</sup>) — the Q-learning **target**,
+  computed with the *frozen* θ<sup>−</sup> so it stays still while we fit.
+- Q(s,a; θ) — the current **prediction**.
+- (target − prediction)<sup>2</sup> — squared TD error; 𝔼[·] averages it over the
+  minibatch.
+
+*Intuition:* plain regression of Q(s,a;θ) onto a Q-learning target, with the two
+stabilizers built in — **replay** (the ∼D sampling decorrelates data) and the
+**target network** (θ<sup>−</sup> stops the target from chasing its own tail).
+Together they tame the deadly triad.
 
 Naively combining Q-learning with a neural net hits the **deadly triad** and
 diverges. DQN introduces two stabilizing tricks:
@@ -499,6 +769,21 @@ a gradient by sampling perturbations:
 
 $$\nabla_\theta\, \mathbb{E}_{\varepsilon\sim N(0,I)}\big[ F(\theta + \sigma\varepsilon) \big] \approx \frac{1}{\sigma}\, \mathbb{E}_\varepsilon\big[ F(\theta + \sigma\varepsilon)\, \varepsilon \big]$$
 
+**Reading it term by term.**
+
+- F(θ) — the black-box **fitness**: the total episode return of the policy with
+  parameters θ (no gradients needed inside).
+- ε ∼ N(0,I) — a random Gaussian **perturbation** vector.
+- θ + σε — the parameters jittered by noise of scale σ.
+- LHS — the gradient of the **smoothed** objective (return averaged over jitters).
+- RHS (1/σ) 𝔼<sub>ε</sub>[ F(θ+σε) ε ] — estimate that gradient by sampling many
+  perturbations and taking a **return-weighted average of the noise directions**.
+
+*Intuition:* perturbations that *raised* the return pull θ toward them; those that
+*lowered* it push θ away. Only scalar returns and the random seeds need to be
+shared between workers — no backprop through policy or environment — which is why
+ES scales to thousands of CPUs.
+
 The population evaluates many perturbed policies in parallel and θ moves in the
 fitness-weighted direction.
 
@@ -551,10 +836,37 @@ return of trajectories τ generated by π<sub>θ</sub>.
 
 $$\nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta}\!\Big[ \sum_t \nabla_\theta \log \pi_\theta(a_t\mid s_t)\, Q^\pi(s_t, a_t) \Big]$$
 
+**Reading it term by term.**
+
+- J(θ) — the expected return of policy π<sub>θ</sub>; ∇<sub>θ</sub>J is the
+  direction to step θ for **gradient ascent**.
+- ∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub>∣s<sub>t</sub>) — the **score**: the
+  direction in θ that makes action a<sub>t</sub> *more probable* in s<sub>t</sub>.
+- Q<sup>π</sup>(s<sub>t</sub>,a<sub>t</sub>) — how good that action actually was.
+- 𝔼<sub>π<sub>θ</sub></sub>[ Σ<sub>t</sub> · ] — average over trajectories the
+  policy itself generates.
+
+*Intuition:* "raise the log-probability of each action, weighted by how good it
+was." High-Q actions get their probability pushed up, low-Q actions pushed down.
+Because Q simply *multiplies* the score, the environment is never differentiated.
+
 **Proof (trajectory / likelihood-ratio form).** The probability of a trajectory
 τ = (s₀,a₀,s₁,…) under π<sub>θ</sub> is
 
 $$p_\theta(\tau) = \rho(s_0)\prod_t \pi_\theta(a_t\mid s_t)\, P(s_{t+1}\mid s_t,a_t)$$
+
+**Reading it term by term.**
+
+- τ — a whole **trajectory** (s<sub>0</sub>, a<sub>0</sub>, s<sub>1</sub>, a<sub>1</sub>, …).
+- ρ(s<sub>0</sub>) — probability of the starting state.
+- Π<sub>t</sub> π<sub>θ</sub>(a<sub>t</sub>∣s<sub>t</sub>) — probability the **policy**
+  chose each action.
+- Π<sub>t</sub> P(s<sub>t+1</sub>∣s<sub>t</sub>,a<sub>t</sub>) — probability the
+  **environment** produced each next state.
+
+*Intuition:* a trajectory occurs only if the start, every action, and every
+transition occur — so multiply their probabilities. Note **only the π<sub>θ</sub>
+factors depend on θ**; ρ and P do not — the hinge of the whole proof.
 
 Take logs: log p<sub>θ</sub>(τ) = log ρ(s₀) + Σ<sub>t</sub>[ log
 π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>) + log P(s<sub>t+1</sub>|s<sub>t</sub>,a<sub>t</sub>) ].
@@ -562,9 +874,34 @@ The dynamics ρ and P do **not** depend on θ, so
 
 $$\nabla_\theta \log p_\theta(\tau) = \sum_t \nabla_\theta \log \pi_\theta(a_t\mid s_t)$$
 
+**Reading it term by term.**
+
+- Taking the log of the product above turns it into a **sum** of logs.
+- Differentiating that sum in θ: the log ρ(s<sub>0</sub>) and the
+  log P(s<sub>t+1</sub>∣s<sub>t</sub>,a<sub>t</sub>) terms contain no θ, so they
+  **vanish**.
+- Only Σ<sub>t</sub> ∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub>∣s<sub>t</sub>)
+  survives.
+
+*Intuition:* the unknown dynamics drop out under the gradient. This is exactly
+why policy gradients are **model-free** — you never need to know, or
+differentiate, the transition model P.
+
 Now use the **log-derivative (REINFORCE) trick** ∇p = p ∇log p:
 
 $$\nabla_\theta J = \int p_\theta(\tau)\, \nabla_\theta \log p_\theta(\tau)\, R(\tau)\, d\tau = \mathbb{E}_\tau\Big[ R(\tau) \sum_t \nabla_\theta \log \pi_\theta(a_t\mid s_t) \Big]$$
+
+**Reading it term by term.**
+
+- Start from J(θ) = ∫ p<sub>θ</sub>(τ) R(τ) dτ and apply the **log-derivative
+  trick** ∇p = p ∇log p, which slips the gradient inside as a factor ∇log p.
+- ∫ p<sub>θ</sub>(τ)( · ) dτ is, by definition, an expectation 𝔼<sub>τ</sub>[ · ].
+- Substitute ∇<sub>θ</sub> log p<sub>θ</sub>(τ) = Σ<sub>t</sub> ∇<sub>θ</sub> log
+  π<sub>θ</sub> from the previous line.
+
+*Intuition:* the gradient of an expectation has become an expectation we can
+**sample**: run the policy, and weight each trajectory's summed scores by its
+total return R(τ). That sampleable form is precisely REINFORCE.
 
 Crucially, **the model-free property** appears: the gradient needs no knowledge
 of P. Rewards earned *before* t cannot be affected by a<sub>t</sub>, so they
@@ -578,6 +915,18 @@ state-dependent **baseline** b(s) leaves the gradient unbiased (because
 gives the **advantage** form:
 
 $$\nabla_\theta J = \mathbb{E}\Big[ \sum_t \nabla_\theta \log \pi_\theta(a_t\mid s_t)\, A^\pi(s_t,a_t) \Big], \qquad A^\pi = Q^\pi - V^\pi$$
+
+**Reading it term by term.**
+
+- Same as the theorem, but Q<sup>π</sup> is replaced by the **advantage**
+  A<sup>π</sup> = Q<sup>π</sup> − V<sup>π</sup>.
+- V<sup>π</sup>(s) acts as the **baseline** b(s); A<sup>π</sup>(s,a) measures how
+  much better action a is than the state's *average* action.
+
+*Intuition:* subtracting the baseline V<sup>π</sup> leaves the gradient
+**unbiased** (the baseline term averages to zero) but sharply **reduces
+variance** — we now push on *relative* quality. A > 0 ⇒ raise the action's
+probability; A < 0 ⇒ lower it; A ≈ 0 ⇒ leave it alone.
 
 ## 6. What is the REINFORCE algorithm?
 
@@ -593,6 +942,20 @@ Algorithm:
 3. Update parameters by gradient *ascent*:
 
 $$\theta \leftarrow \theta + \alpha \sum_t \nabla_\theta \log \pi_\theta(a_t\mid s_t)\, \big( G_t - b(s_t) \big)$$
+
+**Reading it term by term.**
+
+- After a full episode, for each step take the **score**
+  ∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub>∣s<sub>t</sub>).
+- G<sub>t</sub> — the actual return from t, the Monte-Carlo estimate of
+  Q<sup>π</sup>(s<sub>t</sub>,a<sub>t</sub>).
+- b(s<sub>t</sub>) — a **baseline** (typically a learned V̂(s<sub>t</sub>))
+  subtracted to cut variance.
+- α — step size; the **+** sign makes this gradient *ascent* (we maximize return).
+
+*Intuition:* the practical, sampled form of the theorem — weight each action's
+score by how much its observed return **beat the baseline**. Unbiased, but
+high-variance because G<sub>t</sub> is a noisy whole-episode sample.
 
 The optional **baseline** b(s) (typically a learned V̂(s)) does not bias the
 gradient but greatly reduces variance. REINFORCE is on-policy, unbiased, but
@@ -614,6 +977,20 @@ actor-critic method that parallelizes data collection across many CPU workers
   and the gradients:
 
 $$\nabla_\theta \log \pi_\theta(a_t\mid s_t)\, \hat A_t + \beta\, \nabla_\theta H\big(\pi_\theta(\cdot\mid s_t)\big)$$
+
+**Reading it term by term.**
+
+- ∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub>∣s<sub>t</sub>) Â<sub>t</sub> — the
+  policy-gradient term, with an **estimated advantage** Â<sub>t</sub> from the
+  n-step rollout and the critic.
+- H(π<sub>θ</sub>(·∣s<sub>t</sub>)) — the **entropy** of the policy at
+  s<sub>t</sub> (how spread-out the action distribution is).
+- β — a small coefficient on the entropy bonus.
+- ∇<sub>θ</sub>H — pushes the policy toward being *more* random.
+
+*Intuition:* the first term improves the policy; the second keeps it from
+collapsing to a single deterministic action too soon, preserving exploration. β
+sets how strongly exploration is encouraged.
 
   plus a value loss (Â<sub>t</sub>)² for the critic. An **entropy bonus** H
   encourages exploration.
@@ -647,6 +1024,25 @@ importance weights for stability:
 
 $$v_s = V(s_s) + \sum_{t\ge s} \gamma^{t-s}\Big(\textstyle\prod_{i=s}^{t-1} c_i\Big)\, \delta_t^V, \qquad \delta_t^V = \rho_t\big(r_t + \gamma V(s_{t+1}) - V(s_t)\big)$$
 
+**Reading it term by term.**
+
+- v<sub>s</sub> — the corrected value **target** for state s (what the critic
+  regresses toward); V(s<sub>s</sub>) is the current estimate it starts from.
+- δ<sub>t</sub><sup>V</sup> — a one-step TD error, but scaled by ρ<sub>t</sub>.
+- ρ<sub>t</sub> = min(ρ̄, π/μ) — a **truncated importance weight**: how much more
+  (or less) likely the action was under the *learner* π than under the *stale
+  actor* μ, capped at ρ̄.
+- Π<sub>i=s</sub><sup>t−1</sup> c<sub>i</sub>, with c<sub>i</sub> = min(c̄, π/μ) —
+  a product of truncated weights that discounts the influence of TD errors
+  further into the future.
+- γ<sup>t−s</sup> — the ordinary discount over the horizon.
+
+*Intuition:* an **off-policy-corrected n-step target**. The importance weights
+fix the mismatch between the data-collecting policy μ and the learner π;
+truncating them (ρ̄, c̄) stops them from exploding, trading a little bias for much
+lower variance. **ρ̄ controls *which* value function you converge to; c̄ controls
+*how fast*.**
+
 where ρ<sub>t</sub> = min(ρ̄, π/μ), c<sub>i</sub> = min(c̄, π/μ). Truncation
 controls variance (ρ̄ sets the fixed point, c̄ controls convergence speed).
 
@@ -666,10 +1062,35 @@ identity:
 
 $$J(\tilde\pi) = J(\pi) + \mathbb{E}_{\tau\sim\tilde\pi}\Big[ \sum_t \gamma^t A^\pi(s_t,a_t) \Big]$$
 
+**Reading it term by term.**
+
+- J(π̃) − J(π) — how much better the **new** policy π̃ is than the old π.
+- 𝔼<sub>τ∼π̃</sub>[ Σ<sub>t</sub> γ<sup>t</sup> A<sup>π</sup>(s<sub>t</sub>,a<sub>t</sub>) ]
+  — the expected discounted **advantage of the *old* policy**, but evaluated
+  along trajectories generated by the *new* policy.
+
+*Intuition:* a new policy improves exactly to the extent that, on the states it
+visits, it favors actions the old value function rated above average
+(A<sup>π</sup> > 0). The snag: the expectation is under π̃, which we cannot sample
+until we already have it — which is why the next step introduces a surrogate.
+
 The expectation under π̃ is unavailable, so we use the **surrogate** that samples
 states from the *old* policy and reweights actions by an importance ratio:
 
 $$L_\pi(\tilde\pi) = \mathbb{E}_{s\sim\rho_\pi,\, a\sim\pi}\Big[ \frac{\tilde\pi(a\mid s)}{\pi(a\mid s)}\, A^\pi(s,a) \Big]$$
+
+**Reading it term by term.**
+
+- s ∼ ρ<sub>π</sub> — sample states from the **old** policy's visitation (data we
+  already have); a ∼ π — actions from the old policy too.
+- π̃(a∣s)/π(a∣s) — the **importance ratio**: reweight each old action by how much
+  *more* likely the new policy makes it.
+- A<sup>π</sup>(s,a) — the old advantage.
+
+*Intuition:* we cannot sample under π̃ (previous formula), so we approximate that
+expectation by **reweighting old data** with the probability ratio. This is a
+faithful surrogate only while π̃ stays close to π — hence the trust-region
+constraint that follows.
 
 A bound (Kakade & Langford; Schulman) shows
 J(π̃) ≥ L<sub>π</sub>(π̃) − C·max<sub>s</sub>D<sub>KL</sub>(π‖π̃). Maximizing this
@@ -677,6 +1098,20 @@ lower bound guarantees monotonic improvement, but the penalty makes steps tiny.
 TRPO instead enforces a **hard KL constraint**:
 
 $$\max_\theta\ \mathbb{E}\Big[ \frac{\pi_\theta}{\pi_{\text{old}}}\, \hat A \Big] \quad \text{s.t.} \quad \mathbb{E}\big[ D_{\mathrm{KL}}(\pi_{\text{old}} \,\|\, \pi_\theta) \big] \le \delta$$
+
+**Reading it term by term.**
+
+- max<sub>θ</sub> 𝔼[ (π<sub>θ</sub>/π<sub>old</sub>) Â ] — **maximize the
+  surrogate**: raise the probability of high-advantage actions.
+- "s.t." — *subject to* the following constraint.
+- 𝔼[ D<sub>KL</sub>(π<sub>old</sub> ∥ π<sub>θ</sub>) ] ≤ δ — keep the **KL
+  divergence** (how much the action distribution shifted) below a trust-region
+  radius δ.
+
+*Intuition:* take the largest improvement step you can **without** moving the
+policy more than δ in distribution — the constraint blocks the over-large updates
+that make naive policy gradients collapse. Solved by a natural-gradient direction
+(conjugate gradient on the Fisher matrix) followed by a backtracking line search.
 
 This is solved by a **natural-gradient** step: linearize the objective, take a
 quadratic (Fisher-matrix F) approximation of the KL, giving the search direction
@@ -702,6 +1137,21 @@ Let r<sub>t</sub>(θ) = π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>) /
 
 $$L^{\text{CLIP}}(\theta) = \mathbb{E}_t\Big[ \min\big( r_t(\theta)\, \hat A_t,\ \ \mathrm{clip}(r_t(\theta),\, 1-\epsilon,\, 1+\epsilon)\, \hat A_t \big) \Big]$$
 
+**Reading it term by term.**
+
+- r<sub>t</sub>(θ) = π<sub>θ</sub>/π<sub>old</sub> — the probability **ratio**
+  (same object TRPO used).
+- r<sub>t</sub> Â<sub>t</sub> — the unclipped surrogate.
+- clip(r<sub>t</sub>, 1−ε, 1+ε) — force the ratio into the band [1−ε, 1+ε] so the
+  policy cannot move "too far" on this sample.
+- min(unclipped, clipped) — take the **smaller** (more pessimistic) of the two.
+
+*Intuition:* once the policy has shifted far enough in a good direction (ratio
+past 1±ε) the clip **flattens** the objective, removing any incentive to push
+further. The **min** ensures clipping only removes the incentive to over-step —
+it never rewards moving away. This reproduces TRPO's trust region with a plain
+first-order objective (no second-order math).
+
 **Intuition / derivation.** We want to increase probability of good actions
 (Â>0) and decrease bad ones (Â<0), but not move too far from π<sub>old</sub>.
 The clip caps the ratio to [1−ε, 1+ε] so that once the policy has moved "enough"
@@ -713,6 +1163,19 @@ TRPO's effect without second-order computation.
 Full PPO loss (actor-critic):
 
 $$L = \mathbb{E}_t\Big[ L^{\text{CLIP}} - c_1\big( V_\theta(s_t) - V_t^{\text{targ}} \big)^2 + c_2\, H\big(\pi_\theta(\cdot\mid s_t)\big) \Big]$$
+
+**Reading it term by term.**
+
+- L<sup>CLIP</sup> — the clipped policy objective above (maximized).
+- −c<sub>1</sub>(V<sub>θ</sub>(s<sub>t</sub>) − V<sub>t</sub><sup>targ</sup>)<sup>2</sup>
+  — the **critic loss**: squared error fitting the value function to its target
+  (minus sign because the whole L is *maximized* but this error must shrink).
+- +c<sub>2</sub> H(π<sub>θ</sub>(·∣s<sub>t</sub>)) — an **entropy bonus** for
+  exploration.
+- c<sub>1</sub>, c<sub>2</sub> — coefficients balancing the three pieces.
+
+*Intuition:* one combined loss trains actor, critic, and exploration together —
+improve the policy, fit the value function, and stay a little random.
 
 Advantages are usually estimated with **GAE**. PPO runs several epochs of
 minibatch SGD over each batch of on-policy data, then refreshes the data.
@@ -736,11 +1199,39 @@ policy gradient is:
 
 $$\nabla_\theta J = \mathbb{E}_{s\sim D}\Big[ \nabla_a Q_\phi(s,a)\big|_{a=\mu(s)}\, \nabla_\theta \mu_\theta(s) \Big]$$
 
+**Reading it term by term.**
+
+- μ<sub>θ</sub>(s) — the **deterministic** actor: outputs one action, not a
+  distribution.
+- ∇<sub>a</sub> Q<sub>φ</sub>(s,a)|<sub>a=μ(s)</sub> — how the critic's value
+  changes as you wiggle the action, evaluated at the actor's current output.
+- ∇<sub>θ</sub> μ<sub>θ</sub>(s) — how that action changes as you wiggle the
+  actor's parameters.
+- The two are chained (chain rule); 𝔼<sub>s∼D</sub> averages over replay states.
+
+*Intuition:* "move the actor so it outputs actions the critic scores higher" —
+follow the critic's action-gradient uphill. This works **only** because actions
+are continuous and Q is differentiable in a (no discrete argmax).
+
 i.e. move the actor to output actions that the critic rates highly (chain rule
 through Q). The critic is trained with the **DQN-style TD target** using target
 networks θ′, φ′:
 
 $$y = r + \gamma Q_{\phi'}\big(s', \mu_{\theta'}(s')\big), \qquad L(\phi) = \mathbb{E}\big[ (Q_\phi(s,a) - y)^2 \big]$$
+
+**Reading it term by term.**
+
+- μ<sub>θ'</sub>(s') — the **target actor** picks the next action; primes denote
+  slowly-updated target networks.
+- Q<sub>φ'</sub>(s', ·) — the **target critic** evaluates it.
+- y = r + γ Q<sub>φ'</sub>(s', μ<sub>θ'</sub>(s')) — the bootstrap target. Note the
+  discrete "max over actions" of DQN is replaced by "the action the actor
+  outputs" — there is no max in a continuous action space.
+- L(φ) = 𝔼[ (Q<sub>φ</sub>(s,a) − y)<sup>2</sup> ] — fit the critic to y by
+  squared error.
+
+*Intuition:* this is exactly DQN's regression, adapted to continuous control by
+letting the actor supply the next action in place of an argmax.
 
 DDPG uses a **replay buffer** (off-policy), **target networks** with soft updates
 (θ′ ← τθ + (1−τ)θ′), and **exploration noise** added to actions (originally
@@ -801,6 +1292,19 @@ evaluates it:
 
 $$a^* = \arg\max_{a'} Q_A(s',a'); \qquad \text{target} = r + \gamma\, Q_B(s', a^*)$$
 
+**Reading it term by term.**
+
+- Q<sub>A</sub>, Q<sub>B</sub> — two **independently** learned value estimators.
+- a<sup>*</sup> = arg max<sub>a'</sub> Q<sub>A</sub>(s',a') — use Q<sub>A</sub> to
+  **select** the best next action.
+- target = r + γ Q<sub>B</sub>(s', a<sup>*</sup>) — use the *other* estimator
+  Q<sub>B</sub> to **evaluate** that chosen action.
+
+*Intuition:* the max's upward bias arises from using the *same* noisy values both
+to pick and to judge the action. Selecting with Q<sub>A</sub> but evaluating with
+Q<sub>B</sub> makes the two noises **independent**, so they largely cancel instead
+of reinforcing.
+
 (and symmetrically, randomly updating one or the other). Because the noise in
 selection and evaluation is independent, the upward bias largely cancels.
 
@@ -808,6 +1312,18 @@ selection and evaluation is independent, the upward bias largely cancels.
 net selects the argmax action, the **target** net evaluates it:
 
 $$y = r + \gamma\, Q\big(s',\, \arg\max_{a'} Q(s',a';\theta);\, \theta^-\big)$$
+
+**Reading it term by term.**
+
+- arg max<sub>a'</sub> Q(s',a'; θ) — the **online** network θ **selects** the
+  next action.
+- Q(s', · ; θ<sup>−</sup>) — the **target** network θ<sup>−</sup> **evaluates**
+  that selected action.
+- y = r + γ × (that evaluation) — the corrected bootstrap target.
+
+*Intuition:* the deep version of double Q-learning, reusing DQN's two existing
+networks — online selects, target evaluates — so it cancels most of the
+overestimation at essentially **zero extra cost**.
 
 **When/why used:** whenever Q-learning-style **max-bootstrapping** with function
 approximation causes overestimation that degrades or destabilizes learning —
@@ -842,11 +1358,37 @@ as possible:
 
 $$J(\pi) = \sum_t \mathbb{E}\big[ r(s_t,a_t) + \alpha\, H(\pi(\cdot\mid s_t)) \big]$$
 
+**Reading it term by term.**
+
+- r(s<sub>t</sub>,a<sub>t</sub>) — the usual reward.
+- H(π(·∣s<sub>t</sub>)) — the **entropy** (randomness) of the policy at
+  s<sub>t</sub>.
+- α — the **temperature**, weighting entropy against reward.
+- Σ<sub>t</sub> 𝔼[ · ] — the summed expected value over the trajectory.
+
+*Intuition:* maximize reward **and** stay as random as possible — the agent earns
+a bonus for keeping its options open, which drives exploration and robustness.
+As α → 0 this collapses back to ordinary RL.
+
 α is the **temperature** trading off reward vs. entropy.
 
 **Soft value functions.** The soft Q and V satisfy modified Bellman equations:
 
 $$Q(s,a) = r + \gamma\, \mathbb{E}_{s'}\big[ V(s') \big], \qquad V(s) = \mathbb{E}_{a\sim\pi}\big[ Q(s,a) - \alpha \log \pi(a\mid s) \big]$$
+
+**Reading it term by term.**
+
+- *Left:* soft Q has the ordinary shape — immediate reward plus discounted
+  next-state value.
+- *Right:* the soft V averages Q over actions but **subtracts**
+  α log π(a∣s).
+- −α log π(a∣s) — the per-action entropy contribution; averaged over a ∼ π it
+  equals +α H(π).
+
+*Intuition:* the value of a state now includes a **bonus for acting randomly**.
+Folding the entropy term into the Bellman backup yields "soft" value functions
+whose greedy policy is a **Boltzmann distribution** over Q-values rather than a
+hard argmax.
 
 **Components / derivation.**
 
@@ -877,6 +1419,18 @@ J(π) = 𝔼[ Σ γ<sup>t</sup> r<sub>t</sub> ]. The optimal policy is (in gener
 *and* high-randomness behavior:
 
 $$J(\pi) = \sum_t \mathbb{E}_{(s_t,a_t)\sim\pi}\big[ r(s_t,a_t) + \alpha\, H(\pi(\cdot\mid s_t)) \big]$$
+
+**Reading it term by term.**
+
+- Same as the SAC objective, but with the expectation written explicitly over
+  (s<sub>t</sub>,a<sub>t</sub>) generated by following π.
+- r — reward; α H(π(·∣s<sub>t</sub>)) — entropy bonus with temperature α.
+
+*Intuition:* the general **maximum-entropy RL** objective. Whereas standard RL
+(just Σ 𝔼[r]) has a *deterministic* optimum, adding α H makes the optimum
+**stochastic** — a softmax over soft Q-values, π<sup>*</sup>(a∣s) ∝
+exp(Q<sub>soft</sub>/α). α dials from "purely greedy" (α → 0) toward "purely
+random" (α → ∞).
 
 with H(π(·|s)) = −𝔼<sub>a~π</sub>[ log π(a|s) ] and temperature α (as α→0 it
 recovers standard RL). The optimal policy is **stochastic** — a Boltzmann
@@ -921,6 +1475,20 @@ contextual (state-dependent), Bayesian.
 
 $$R_T = T\mu^* - \mathbb{E}\Big[ \sum_{t=1}^T \mu_{A_t} \Big] = T\mu^* - \mathbb{E}\Big[ \sum_t X_t \Big]$$
 
+**Reading it term by term.**
+
+- μ<sup>*</sup> = max<sub>a</sub> μ<sub>a</sub> — the mean reward of the **best** arm.
+- Tμ<sup>*</sup> — what an oracle earns by always pulling that best arm for T rounds.
+- 𝔼[ Σ μ<sub>A<sub>t</sub></sub> ] — expected reward of the arms the algorithm
+  *actually* chose (A<sub>t</sub> is the arm picked at round t).
+- Their difference is R<sub>T</sub>, the **regret**.
+- The second form uses X<sub>t</sub>, the observed reward, which equals
+  μ<sub>A<sub>t</sub></sub> in expectation.
+
+*Intuition:* regret is the **shortfall versus an oracle** that always plays the
+best arm. Minimizing regret is the same as maximizing reward, just measured
+relative to the best achievable.
+
 Minimizing regret is equivalent to maximizing reward, but regret is the natural
 *relative* performance measure (vs. an oracle that always plays the best arm).
 
@@ -929,6 +1497,19 @@ Minimizing regret is equivalent to maximizing reward, but regret is the natural
 pulled. Then:
 
 $$R_T = \sum_a \Delta_a\, \mathbb{E}\big[ N_a(T) \big]$$
+
+**Reading it term by term.**
+
+- Δ<sub>a</sub> = μ<sup>*</sup> − μ<sub>a</sub> — the **gap**: how much worse arm a
+  is than the best.
+- N<sub>a</sub>(T) — how many times arm a was pulled in T rounds;
+  𝔼[N<sub>a</sub>(T)] is the expected count.
+- The regret is Σ<sub>a</sub> (gap) × (expected pulls).
+
+*Intuition:* each pull of a suboptimal arm costs exactly its gap Δ<sub>a</sub>, so
+total regret is those costs summed. To keep regret small, pull large-gap arms
+rarely — which is why every regret proof reduces to bounding 𝔼[N<sub>a</sub>(T)]
+for suboptimal arms.
 
 This is fundamental: regret is the sum over arms of (gap) × (expected pulls). It
 shows that to keep regret small an algorithm must pull each suboptimal arm only
@@ -942,6 +1523,22 @@ reduces to bounding 𝔼[N<sub>a</sub>(T)] for suboptimal arms.
 
 $$\liminf_{T\to\infty} \frac{R_T}{\log T} \ge \sum_{a:\, \Delta_a > 0} \frac{\Delta_a}{\mathrm{KL}(p_a \,\|\, p^*)}$$
 
+**Reading it term by term.**
+
+- R<sub>T</sub>/log T — regret measured in units of log T; liminf is its long-run
+  floor.
+- Σ<sub>a: Δ<sub>a</sub>>0</sub> — sum over the suboptimal arms.
+- Δ<sub>a</sub> — the gap (cost per pull).
+- KL(p<sub>a</sub> ‖ p<sup>*</sup>) — the **KL divergence** between arm a's reward
+  distribution and the best arm's: how *statistically distinguishable* they are.
+- Δ<sub>a</sub> / KL — a costly arm (large Δ) that is hard to tell apart from the
+  best (small KL) is the most expensive to learn about.
+
+*Intuition:* no consistent algorithm can beat this **Ω(log T)** floor. You must
+sample a suboptimal arm enough times to become statistically sure it is worse,
+and the harder it is to distinguish, the more pulls that takes. UCB and Thompson
+sampling attain this bound.
+
 where KL(p<sub>a</sub>‖p\*) is the Kullback–Leibler divergence between arm a's
 reward distribution and the optimal arm's. So **no algorithm can achieve regret
 of smaller order than log T** (an Ω(log T) lower bound) on a fixed instance; the
@@ -953,6 +1550,17 @@ Thompson sampling match this bound (asymptotically optimal).
 instance for a given horizon, no algorithm can guarantee better than
 
 $$R_T = \Omega\big( \sqrt{K T} \big)$$
+
+**Reading it term by term.**
+
+- K — number of arms; T — horizon.
+- Ω(√(KT)) — a lower bound that holds for the **worst-case** instance, no matter
+  the gaps.
+
+*Intuition:* the log-T bound assumes fixed, constant-sized gaps; but if the gaps are
+tiny (on the order of 1/√T) the arms are nearly indistinguishable, and even the
+best algorithm suffers √(KT) regret. This is the **minimax** regime; MOSS and
+minimax-tuned UCB meet the matching O(√(KT)) upper bound.
 
 (for K arms over T rounds). Intuitively when gaps are tiny (~1/√T) the arms are
 hard to tell apart. Algorithms like **MOSS** and minimax-tuned UCB achieve the
@@ -993,6 +1601,21 @@ exploration bonus that shrinks as the arm is sampled more.
 
 $$A_t = \arg\max_a \left[ \hat\mu_a + \sqrt{\frac{2\ln t}{N_a(t)}} \right]$$
 
+**Reading it term by term.**
+
+- μ̂<sub>a</sub> — the **empirical mean** reward of arm a so far (the
+  *exploitation* term).
+- √(2 ln t / N<sub>a</sub>(t)) — the **exploration bonus** / confidence width:
+  - ln t (numerator) grows slowly with time, so arms not tried for a while look
+    tempting again;
+  - N<sub>a</sub>(t) (denominator) shrinks the bonus as arm a is sampled more (we
+    grow confident in it).
+- arg max<sub>a</sub> — play the arm with the highest **upper bound** (mean + bonus).
+
+*Intuition:* "**optimism in the face of uncertainty**" — treat each arm as good
+as its data plausibly allow. The bonus (from Hoeffding's inequality) guarantees
+no arm is starved forever, since its width keeps growing until it is re-sampled.
+
 - μ̂<sub>a</sub> = empirical mean (exploitation term).
 - The bonus √(2 ln t / N<sub>a</sub>) grows with t (revisit arms we are unsure
   about) and shrinks with N<sub>a</sub> (confidence in well-sampled arms). It
@@ -1024,6 +1647,19 @@ Because the Beta is conjugate to the Bernoulli likelihood, after observing
 outcomes the posterior is again Beta — updates are trivial counting:
 
 $$\text{success: } (\alpha,\beta) \leftarrow (\alpha+1,\, \beta) \qquad\qquad \text{failure: } (\alpha,\beta) \leftarrow (\alpha,\, \beta+1)$$
+
+**Reading it term by term.**
+
+- (α, β) — the parameters of the **Beta posterior** on an arm's success
+  probability θ.
+- On a **success** (reward 1): increment α.
+- On a **failure** (reward 0): increment β.
+
+*Intuition:* because the Beta prior is **conjugate** to the Bernoulli likelihood,
+updating the belief is just **counting** — α−1 successes and β−1 failures seen so
+far. The posterior mean α/(α+β) tracks the empirical success rate, and the
+distribution **narrows** as pulls accumulate. This posterior is exactly what
+Thompson sampling draws its samples from.
 
 So α<sub>a</sub> − 1 counts successes and β<sub>a</sub> − 1 counts failures; the
 posterior mean is α<sub>a</sub>/(α<sub>a</sub>+β<sub>a</sub>) and its variance
@@ -1151,6 +1787,22 @@ the dynamics are **linear** and the cost is **quadratic**:
 
 $$x_{t+1} = A x_t + B u_t, \qquad \text{cost} = \sum_t \big( x_t^\top Q\, x_t + u_t^\top R\, u_t \big)$$
 
+**Reading it term by term.**
+
+- x<sub>t</sub> — the **state** vector; u<sub>t</sub> — the **control** (action)
+  vector.
+- x<sub>t+1</sub> = A x<sub>t</sub> + B u<sub>t</sub> — **linear** dynamics: A says
+  how the state drifts on its own, B how the control moves it.
+- x<sub>t</sub><sup>⊤</sup>Q x<sub>t</sub> — a quadratic penalty for being away
+  from the origin (Q⪰0 weights which state components matter).
+- u<sub>t</sub><sup>⊤</sup>R u<sub>t</sub> — a quadratic penalty on control
+  **effort** (R≻0).
+
+*Intuition:* "steer the state to zero while spending as little control as
+possible," with everything measured by squared (quadratic) costs. This
+linear-dynamics + quadratic-cost structure is exactly what makes the optimal
+controller solvable in closed form.
+
 (x = state, u = control/action, Q⪰0, R≻0). **Derivation by dynamic programming
 (backward Riccati recursion):** the cost-to-go is quadratic, V<sub>t</sub>(x) =
 xᵀP<sub>t</sub>x. Starting from the terminal P<sub>T</sub>=Q and going backward,
@@ -1160,7 +1812,37 @@ with
 
 $$K_t = (R + B^\top P_{t+1} B)^{-1} B^\top P_{t+1} A$$
 
+**Reading it term by term.**
+
+- P<sub>t+1</sub> — the **cost-to-go** matrix one step later (the value function is
+  V<sub>t+1</sub>(x) = x<sup>⊤</sup>P<sub>t+1</sub>x).
+- B<sup>⊤</sup>P<sub>t+1</sub>A — how a control applied now couples, through the
+  dynamics, to future cost.
+- (R + B<sup>⊤</sup>P<sub>t+1</sub>B)<sup>−1</sup> — invert the **effective**
+  control cost: immediate effort R plus the downstream cost the control creates.
+- K<sub>t</sub> — the **feedback gain**; the optimal control is
+  u<sub>t</sub> = −K<sub>t</sub>x<sub>t</sub>.
+
+*Intuition:* the gain weighs spending control now (R) against the future cost a
+control incurs (via B and P<sub>t+1</sub>). At runtime you just multiply the
+current state by −K<sub>t</sub> to get the best action.
+
 $$P_t = Q + A^\top P_{t+1} A - A^\top P_{t+1} B\, (R + B^\top P_{t+1} B)^{-1} B^\top P_{t+1} A$$
+
+**Reading it term by term.**
+
+- Computes P<sub>t</sub> (cost-to-go now) from P<sub>t+1</sub> (cost-to-go next),
+  running **backward** from the terminal condition P<sub>T</sub> = Q.
+- Q — the immediate state cost.
+- A<sup>⊤</sup>P<sub>t+1</sub>A — the future cost *if no control were applied*.
+- − A<sup>⊤</sup>P<sub>t+1</sub>B (R+B<sup>⊤</sup>P<sub>t+1</sub>B)<sup>−1</sup>B<sup>⊤</sup>P<sub>t+1</sub>A
+  — the cost **reduction** the optimal control achieves (note it embeds the same
+  factor that defines K<sub>t</sub>).
+
+*Intuition:* this is the **backward Riccati recursion** — the dynamic-programming
+backup specialized to linear-quadratic problems. "Value now = immediate cost +
+best achievable future cost." Iterating it from the horizon back to t = 0
+produces every P<sub>t</sub>, and hence every gain K<sub>t</sub>.
 
 **iLQR (iterative LQR)** extends LQR to **nonlinear** dynamics and general costs
 by iterating: (1) roll out the current control sequence; (2) **linearize** the
@@ -1209,6 +1891,21 @@ most promising lines via sampled rollouts. Each iteration has **four phases:**
    **UCT** = UCB applied to trees):
 
 $$a = \arg\max_a \left[ Q(s,a) + c\sqrt{\frac{\ln N(s)}{N(s,a)}} \right]$$
+
+**Reading it term by term.**
+
+- Q(s,a) — the current estimated value of action a at tree node s
+  (**exploitation**).
+- N(s) — number of visits to node s; N(s,a) — visits to the edge (s,a).
+- √(ln N(s) / N(s,a)) — the UCB **exploration bonus**, larger for children that
+  have been tried less often.
+- c — a constant setting the exploration/exploitation balance.
+- arg max<sub>a</sub> — descend toward the child with the best optimistic score.
+
+*Intuition:* this is **UCB1 applied inside the search tree** ("UCT"). At each
+node, follow the move that looks best after adding an uncertainty bonus for
+rarely-tried moves, so search effort concentrates on promising lines without
+permanently ignoring the rest.
 
    balancing exploitation (Q) and exploration (the bonus).
 2. **Expansion:** add a new child node for an untried action at the leaf.
@@ -1322,6 +2019,21 @@ Idea: instead of a 1-step TD target r + γV(s′), **unroll the learned model H
 steps** and bootstrap the value only at the end:
 
 $$V^{\text{targ}}(s) = \sum_{k=0}^{H-1} \gamma^k\, \hat r_k + \gamma^H V(\hat s_H)$$
+
+**Reading it term by term.**
+
+- r̂<sub>k</sub>, ŝ<sub>k</sub> — rewards and states **imagined** by rolling the
+  *learned model* forward from s.
+- Σ<sub>k=0</sub><sup>H−1</sup> γ<sup>k</sup> r̂<sub>k</sub> — the discounted
+  model-predicted rewards over H steps.
+- γ<sup>H</sup> V(ŝ<sub>H</sub>) — bootstrap on the learned value, but only at the
+  *end* of the H-step rollout.
+
+*Intuition:* the same shape as an n-step return, except the "real" rewards are
+replaced by **model predictions** for H steps — the horizon over which the model
+is still trustworthy — after which we lean on the learned value. Trusting the
+model only briefly yields lower-variance, more accurate targets while **capping
+model bias to the horizon H**.
 
 where r̂<sub>k</sub>, ŝ<sub>k</sub> come from the model. By trusting the model only
 for a **short horizon H** (where it is accurate) and using the learned value
@@ -1724,6 +2436,21 @@ The **distributional Bellman equation** is, in distribution:
 
 $$Z^\pi(s,a) \stackrel{D}{=} R(s,a) + \gamma\, Z^\pi(S', A'), \qquad S'\sim P,\ A'\sim\pi$$
 
+**Reading it term by term.**
+
+- Z<sup>π</sup>(s,a) — a **random variable**: the *whole distribution* of returns
+  from (s,a), whose mean is the ordinary Q(s,a).
+- =<sup>D</sup> — "equal **in distribution**" (the two sides share a distribution,
+  not a single value).
+- R(s,a) — the random immediate reward.
+- γ Z<sup>π</sup>(S',A') — the next pair's return distribution, scaled by γ.
+- S'∼P, A'∼π — next state from the dynamics, next action from the policy.
+
+*Intuition:* the ordinary Bellman equation lifted to **distributions**: the
+return-from-here distribution equals reward plus a discounted, shifted copy of
+the return-from-next distribution. Taking the expectation of both sides collapses
+it back to the familiar scalar Bellman equation for Q.
+
 The corresponding **operators** act on distributions:
 
 - **Distributional Bellman (evaluation) operator** 𝒯<sup>π</sup>:
@@ -1749,6 +2476,22 @@ distribution** over a **fixed set of N = 51 "atoms"** (support points)
 z₀…z<sub>N−1</sub> evenly spaced on [V<sub>min</sub>, V<sub>max</sub>]:
 
 $$Z(s,a) = \sum_i p_i(s,a)\, \delta_{z_i}, \qquad p_i = \text{softmax outputs}$$
+
+**Reading it term by term.**
+
+- z<sub>i</sub> — a **fixed grid of atoms** (support points) evenly spaced across
+  [V<sub>min</sub>, V<sub>max</sub>].
+- δ<sub>z<sub>i</sub></sub> — a spike (Dirac mass) sitting at atom z<sub>i</sub>.
+- p<sub>i</sub>(s,a) — the probability put on atom z<sub>i</sub>, produced by a
+  **softmax** head (so the p<sub>i</sub> are nonnegative and sum to 1).
+- Z(s,a) = Σ<sub>i</sub> p<sub>i</sub> δ<sub>z<sub>i</sub></sub> — the return
+  distribution approximated as weighted spikes on the fixed atoms.
+
+*Intuition:* model the return distribution as a **histogram on a fixed grid** —
+the network only outputs the bar heights p<sub>i</sub>. Learning shuffles
+probability mass between atoms; because the atom *locations* are fixed, the
+Bellman target (whose atoms r + γz<sub>i</sub> land between the grid points) must
+be **projected** back onto the grid — the ΦT step.
 
 The network outputs the **probabilities p<sub>i</sub>(s,a)** for each
 (action, atom). Learning:
