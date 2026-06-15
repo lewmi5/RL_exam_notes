@@ -114,7 +114,7 @@ is greedy with respect to its own value function — they are mutually consisten
 - **State-value V<sup>π</sup>(s)** = expected return starting from state s and
   then following π. It answers "how good is this state?"
 - **Action-value (q-function) Q<sup>π</sup>(s, a)** = expected return starting
-  from s, taking action a *now* (possibly off-policy for one step), then
+  from s, taking an arbitrary action a *now* (not necessarily the one π would pick), then
   following π. It answers "how good is this action in this state?"
 
 They are related by:
@@ -374,8 +374,8 @@ methods:
   changes, and consecutive samples are highly correlated, violating i.i.d.
   assumptions of SGD.
 - **Moving targets:** the regression target changes as parameters update.
-- **Overestimation:** the max operator combined with noisy estimates biases
-  values upward.
+- **Overestimation (maximization bias):** the max operator over noisy estimates
+  biases values upward — not unique to function approximation, but amplified by it.
 
 **The deadly triad** (Sutton & Barto) — instability/divergence is likely when
 **all three** of the following are combined:
@@ -567,9 +567,12 @@ Now use the **log-derivative (REINFORCE) trick** ∇p = p ∇log p:
 $$\nabla_\theta J = \int p_\theta(\tau)\, \nabla_\theta \log p_\theta(\tau)\, R(\tau)\, d\tau = \mathbb{E}_\tau\Big[ R(\tau) \sum_t \nabla_\theta \log \pi_\theta(a_t\mid s_t) \Big]$$
 
 Crucially, **the model-free property** appears: the gradient needs no knowledge
-of P. Replacing the full-trajectory reward R(τ) by the causally-correct future
-return (rewards before t cannot be affected by a<sub>t</sub>) and taking
-conditional expectations yields the Q<sup>π</sup> form above. Subtracting any
+of P. Rewards earned *before* t cannot be affected by a<sub>t</sub>, so they
+vanish in expectation; for the future rewards the tower rule gives
+𝔼[ Σ<sub>k≥t</sub> γ<sup>k−t</sup> R<sub>k+1</sub> | s<sub>t</sub>, a<sub>t</sub> ] = Q<sup>π</sup>(s<sub>t</sub>, a<sub>t</sub>),
+yielding the Q<sup>π</sup> form above. (Strictly, the discounted objective also
+carries a γ<sup>t</sup> weighting on the state distribution, almost universally
+dropped in practice — see Thomas, 2014.) Subtracting any
 state-dependent **baseline** b(s) leaves the gradient unbiased (because
 𝔼[∇log π · b(s)] = 0) but reduces variance; choosing b(s) = V<sup>π</sup>(s)
 gives the **advantage** form:
@@ -620,7 +623,7 @@ $$\nabla_\theta \log \pi_\theta(a_t\mid s_t)\, \hat A_t + \beta\, \nabla_\theta 
 **Strengths.** No replay buffer (lower memory); decorrelation of data comes from
 *parallel diverse actors* rather than replay, so it works with **on-policy**
 actor-critic; CPU-friendly and fast in wall-clock time; entropy regularization
-aids exploration; stable.
+aids exploration; reasonably robust, though less stable than synchronous A2C.
 
 **Weaknesses.** Asynchrony causes **stale gradients** (workers update with
 slightly old parameters); sample-inefficient (on-policy, data discarded after
@@ -940,8 +943,9 @@ reduces to bounding 𝔼[N<sub>a</sub>(T)] for suboptimal arms.
 $$\liminf_{T\to\infty} \frac{R_T}{\log T} \ge \sum_{a:\, \Delta_a > 0} \frac{\Delta_a}{\mathrm{KL}(p_a \,\|\, p^*)}$$
 
 where KL(p<sub>a</sub>‖p\*) is the Kullback–Leibler divergence between arm a's
-reward distribution and the optimal arm's. So **no algorithm can do better than
-Θ(log T)** regret on a fixed instance; the constant is governed by how
+reward distribution and the optimal arm's. So **no algorithm can achieve regret
+of smaller order than log T** (an Ω(log T) lower bound) on a fixed instance; the
+constant is governed by how
 statistically distinguishable each suboptimal arm is from the best. UCB and
 Thompson sampling match this bound (asymptotically optimal).
 
@@ -1214,9 +1218,10 @@ $$a = \arg\max_a \left[ Q(s,a) + c\sqrt{\frac{\ln N(s)}{N(s,a)}} \right]$$
    visited nodes.
 
 After a budget of iterations, act greedily (most-visited / highest-value root
-action). In **AlphaGo/AlphaZero**, rollouts are replaced by a learned **value
-network**, and a learned **policy network** guides selection (PUCT), making MCTS
-far stronger.
+action). In **AlphaGo Zero / AlphaZero**, rollouts are replaced *entirely* by a learned
+**value network** (the original **AlphaGo** still combined Monte-Carlo rollouts
+with the value net), and a learned **policy network** guides selection (PUCT),
+making MCTS far stronger.
 
 **Strengths:** **anytime** (improves with more compute), needs only a generative
 model/simulator (no gradients), handles **large branching factors** by selective
@@ -1244,7 +1249,8 @@ environment and train the agent **inside its own "dream."** Three parts:
 idea to Atari: learn an **action-conditioned video-prediction** model of the game
 in pixel space, then train a policy (PPO) **inside the learned simulator**,
 periodically collecting a little real data to refine the model. It reaches good
-scores with ~100k real frames — **far more sample-efficient** than model-free DQN.
+scores with ~100k real environment interactions (the "Atari 100k" benchmark;
+≈400k frames at frame-skip 4) — **far more sample-efficient** than model-free DQN.
 
 **Strengths:** strong **sample efficiency**; learning in latent/imagined space is
 cheap and parallelizable; compresses high-dim observations; enables planning and
