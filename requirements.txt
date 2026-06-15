@@ -1,0 +1,19 @@
+# Python dependencies for generate_pdf.py  (RL exam answers -> PDF).
+#
+# Install:   pip install -r requirements.txt
+# Then run:  python generate_pdf.py            # answers.md -> answers.pdf
+#
+# Alternatively, `uv run generate_pdf.py` reads the inline PEP 723 metadata
+# at the top of the script and needs no manual install.
+#
+# Requires Python >= 3.10.
+#
+# NOTE: equation rendering also relies on system tools that pip CANNOT install:
+#   * a LaTeX distribution (TeX Live) providing `latex`, with the
+#     amsmath / amssymb / amsfonts / bm / preview packages
+#   * `dvisvgm` (ships with TeX Live) for DVI -> SVG conversion
+# On Debian/Ubuntu:  sudo apt install texlive-latex-extra dvisvgm
+
+weasyprint>=61
+markdown>=3.5
+pymdown-extensions>=10
