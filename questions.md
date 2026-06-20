@@ -34,11 +34,12 @@
 9. Derive the TRPO algorithm. What are its strengths and weaknesses? (we may ask about the pseudo-code).
 10. Derive the PPO algorithm. What are its strengths and weaknesses? (we may ask about the pseudo-code).
 11. Derive the DDPG/TD3 algorithms. What are their strengths and weaknesses? (we may ask about the pseudo-code).
-12. Describe the replay buffer technique? Where is it used?
-13. What is double Q-learning? Why and when is it used?
-14. What are methods of ensuring exploration in policy algorithms?
-15. Derive the SAC algorithms. What are their strengths and weaknesses? (we may ask about the pseudo-code).
-16. Describe briefly the maximum entropy RL formalism (compare with the “standard” approach).
+12. What is the Polyak averaging? Where is it used? What are the alternatives?
+13. Describe the replay buffer technique? Where is it used?
+14. What is double Q-learning? Why and when is it used?
+15. What are methods of ensuring exploration in policy algorithms?
+16. Derive the SAC algorithms. What are their strengths and weaknesses? (we may ask about the pseudo-code).
+17. Describe briefly the maximum entropy RL formalism (compare with the “standard” approach).
 
 ## Exploration-exploitation:
 1. Multi-armed bandits model.

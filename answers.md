@@ -1255,7 +1255,70 @@ DDPG is notoriously **unstable and hyperparameter-sensitive**; deterministic
 policies explore poorly (need injected noise); TD3 is more complex; both can
 still be brittle compared to SAC, which adds entropy for robustness.
 
-## 12. Describe the replay-buffer technique. Where is it used?
+## 12. What is Polyak averaging? Where is it used? What are the alternatives?
+
+**Polyak averaging** means maintaining a slowly-moving average of a set of
+parameters instead of using their latest values directly. It has two closely
+related faces:
+
+**(1) The optimization sense — Polyak–Ruppert averaging.** Instead of returning
+the final SGD iterate θ<sub>T</sub>, return the running average of the iterates:
+
+$$\bar\theta_T = \frac{1}{T}\sum_{t=1}^{T}\theta_t, \qquad\text{or, online,}\qquad \bar\theta \leftarrow (1-\beta)\,\bar\theta + \beta\,\theta_t .$$
+
+**Reading it term by term.**
+
+- θ<sub>t</sub> — the raw parameter vector after step *t* of (stochastic)
+  gradient descent; it keeps jittering around the optimum because of gradient
+  noise.
+- θ̄<sub>T</sub> — the **average** of those iterates; the per-step noise largely
+  cancels, so the average sits much closer to the true minimizer.
+- The online form is an exponential moving average (EMA) with rate β, which
+  avoids storing the whole trajectory.
+
+*Intuition:* SGD bounces around the optimum rather than landing on it; averaging
+the bounces recovers a low-variance estimate. Polyak & Juditsky (1992) showed
+this attains the **optimal asymptotic convergence rate** even with a constant-ish
+step size.
+
+**(2) The deep-RL sense — soft target updates (the dominant usage).** In
+off-policy actor-critic / value methods we keep a **target network** whose
+parameters track the online network as an exponential moving average:
+
+$$\phi' \leftarrow \tau\,\phi + (1-\tau)\,\phi', \qquad 0 < \tau \ll 1 \;(\text{e.g. } \tau = 0.005).$$
+
+**Reading it term by term.**
+
+- φ — the **online** parameters, updated every gradient step.
+- φ′ — the **target** parameters used to form the bootstrap target
+  y = r + γ Q<sub>φ′</sub>(s′,·); they must move slowly so the regression target
+  is approximately stationary.
+- τ — the mixing rate; each step nudges φ′ a tiny fraction τ toward φ. Small τ
+  ⇒ very slow, stable target; τ = 1 recovers "copy every step."
+
+*Intuition:* the critic is chasing a target built from its own predictions; if
+the target moves as fast as the network, learning diverges. Polyak averaging
+makes the target a smoothed, lagging copy, decoupling "what we fit to" from "what
+we update," which is exactly what stabilizes the bootstrap.
+
+**Where it is used.** The soft update is standard in **DDPG, TD3, and SAC** (for
+both critics and, in DDPG/TD3, the target actor); it is the soft alternative to
+DQN's target network. The averaging-of-iterates idea also appears as **EMA
+"teacher" networks** in self-supervised / semi-supervised learning (mean teacher,
+BYOL, EMA of the policy for evaluation) and as **Stochastic Weight Averaging
+(SWA)** in supervised deep learning.
+
+**Alternatives.**
+
+- **Hard / periodic target update (DQN):** copy φ′ ← φ once every *C* steps. This
+  is the discrete counterpart of Polyak's continuous soft update — a few large
+  jumps instead of many tiny nudges. Roughly C ≈ 1/τ.
+- **No target network:** bootstrap off the online network directly — simplest but
+  often unstable / divergent with function approximation.
+- For the optimization sense: just use the **last iterate**, or use **SWA** /
+  learning-rate averaging schemes.
+
+## 13. Describe the replay-buffer technique. Where is it used?
 
 A **replay buffer** is a (usually fixed-size, FIFO) memory storing past
 transitions (s, a, r, s′, done). During learning, minibatches are **sampled
@@ -1279,7 +1342,7 @@ proportional to their TD error (importance-corrected) to focus on the most
 informative/surprising transitions. **Hindsight Experience Replay (HER)** relabels
 goals to learn from failed episodes (sparse-reward, goal-conditioned tasks).
 
-## 13. What is double Q-learning? Why and when is it used?
+## 14. What is double Q-learning? Why and when is it used?
 
 **Problem.** Standard Q-learning's target uses max<sub>a′</sub> Q(s′,a′). Because
 Q is noisy, the *max of noisy estimates* is systematically **biased upward**
@@ -1331,7 +1394,7 @@ i.e. essentially all value-based deep RL. It improves stability and final
 performance at negligible cost and is a component of Rainbow. The same idea
 (taking a **min** of two critics) appears in TD3 and SAC.
 
-## 14. Methods of ensuring exploration in policy algorithms.
+## 15. Methods of ensuring exploration in policy algorithms.
 
 - **Stochastic policies:** sampling actions from π<sub>θ</sub>(·|s) inherently
   explores; key in REINFORCE/A3C/PPO.
@@ -1349,7 +1412,7 @@ performance at negligible cost and is a component of Rainbow. The same idea
   functions.
 - **Goal-based exploration:** HER, Go-Explore, diversity objectives.
 
-## 15. Derive SAC — strengths and weaknesses.
+## 16. Derive SAC — strengths and weaknesses.
 
 **SAC (Soft Actor-Critic)** (Haarnoja et al., 2018) is an **off-policy
 maximum-entropy** actor-critic for continuous control. It augments the reward
@@ -1409,7 +1472,7 @@ parts (two critics, target nets, temperature); originally for continuous actions
 (discrete variants exist); entropy weighting and tanh-squashing add complexity;
 maximum-entropy objective can slightly bias the optimal policy if α is set wrong.
 
-## 16. Maximum-entropy RL formalism (vs. the standard approach).
+## 17. Maximum-entropy RL formalism (vs. the standard approach).
 
 **Standard RL** maximizes expected return only:
 J(π) = 𝔼[ Σ γ<sup>t</sup> r<sub>t</sub> ]. The optimal policy is (in general)
