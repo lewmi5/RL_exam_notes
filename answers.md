@@ -620,10 +620,15 @@ remedies that make the triad workable in practice.
 For **linear** value approximation v̂(s) = φ(s)ᵀw, we can solve for w in closed
 form by least squares instead of incremental SGD — far more sample-efficient.
 
-- **LSMC (Least-Squares Monte-Carlo):** minimize Σ<sub>t</sub>(G<sub>t</sub> −
-  φ(S<sub>t</sub>)ᵀw)². The solution is ordinary least squares:
+- **LSMC (Least-Squares Monte-Carlo):** ordinary linear regression of the
+  **Monte-Carlo return** onto the features. It minimizes the **mean-squared
+  return error**
 
-$$w = \Big( \sum_t \phi(S_t)\,\phi(S_t)^\top \Big)^{-1} \sum_t \phi(S_t)\, G_t$$
+$$J_{\text{MC}}(w) = \sum_t \big(G_t - \varphi(S_t)^\top w\big)^2$$
+
+  whose minimizer is the closed-form least-squares solution:
+
+$$w = \Big( \sum_t \varphi(S_t)\,\varphi(S_t)^\top \Big)^{-1} \sum_t \varphi(S_t)\, G_t$$
 
 **Reading it term by term.**
 
@@ -641,10 +646,21 @@ $$w = \Big( \sum_t \phi(S_t)\,\phi(S_t)^\top \Big)^{-1} \sum_t \phi(S_t)\, G_t$$
 
   Uses the unbiased MC return as target.
 
-- **LSTD (Least-Squares Temporal-Difference):** set the expected TD update to
-  zero. The TD fixed point is:
+- **LSTD (Least-Squares Temporal-Difference):** regression of the
+  **bootstrapped TD target** R<sub>t+1</sub> + γ v̂(S<sub>t+1</sub>) onto the
+  features. Because that target itself depends on w, this is not a plain
+  least-squares fit; LSTD instead minimizes the **mean-squared projected
+  Bellman error**
 
-$$w = A^{-1} b, \qquad A = \sum_t \phi(S_t)\big(\phi(S_t) - \gamma\phi(S_{t+1})\big)^\top, \qquad b = \sum_t \phi(S_t)\, R_{t+1}$$
+$$J_{\text{PBE}}(w) = \big\| \Pi\big(T^\pi \hat v_w - \hat v_w\big) \big\|_D^2$$
+
+  where Π projects onto the feature space and D is the state-visitation
+  weighting. Its minimum (zero) requires the expected TD error to be
+  **orthogonal to the features**, Σ<sub>t</sub> φ(S<sub>t</sub>)δ<sub>t</sub> = 0
+  with δ<sub>t</sub> = R<sub>t+1</sub> + γφ(S<sub>t+1</sub>)ᵀw − φ(S<sub>t</sub>)ᵀw.
+  These normal equations give the TD fixed point:
+
+$$w = A^{-1} b, \qquad A = \sum_t \varphi(S_t)\big(\varphi(S_t) - \gamma\varphi(S_{t+1})\big)^\top, \qquad b = \sum_t \varphi(S_t)\, R_{t+1}$$
 
 **Reading it term by term.**
 
@@ -657,11 +673,48 @@ $$w = A^{-1} b, \qquad A = \sum_t \phi(S_t)\big(\phi(S_t) - \gamma\phi(S_{t+1})\
 
 *Intuition:* the batch version of TD(0). Rather than regressing on full returns
 (LSMC), it solves directly for the weights at which the average TD error,
-projected onto the features, is **zero**. No step size; cost is O(d²)–O(d³) from
-forming and inverting A.
+projected onto the features, is **zero**. Note this is the *projected* Bellman
+error (MSPBE), **not** the raw mean-squared TD error 𝔼[δ²] — the two have
+different minimizers. No step size; cost is O(d²)–O(d³) from forming and
+inverting A.
 
   This directly computes the TD solution from a batch of data, no step-size
   tuning, using all samples efficiently.
+
+**Why the *projected* Bellman error?** The value functions a linear model can
+represent are exactly v̂<sub>w</sub> = Φw — the **subspace** span(Φ), a "plane"
+inside the full value space. The Bellman operator T<sup>π</sup>v = R<sup>π</sup> +
+γP<sup>π</sup>v has the true value v<sup>π</sup> as its fixed point, but applying
+it to a representable function generally lands **outside** the plane, so no w
+solves v̂<sub>w</sub> = T<sup>π</sup>v̂<sub>w</sub> exactly. Three objectives
+measure the residual differently — and have **different minimizers**:
+
+$$\underbrace{\big\|\hat v_w - T^\pi \hat v_w\big\|_D^2}_{\text{MSBE}}, \qquad \underbrace{\mathbb{E}\big[\delta^2\big]}_{\text{raw TD error}}, \qquad \underbrace{\big\|\hat v_w - \Pi\,T^\pi \hat v_w\big\|_D^2}_{\text{MSPBE: LSTD's target}}$$
+
+all under the on-policy weighted norm ‖v‖<sup>2</sup><sub>D</sub> = Σ<sub>s</sub>
+d<sup>π</sup>(s) v(s)<sup>2</sup>.
+
+*Geometric picture — "back up, then project."* Let Π be the D-orthogonal
+projection onto span(Φ):
+
+$$\Pi = \Phi\big(\Phi^\top D\,\Phi\big)^{-1}\Phi^\top D.$$
+
+A Bellman backup kicks v̂<sub>w</sub> **off** the plane; Π pulls it back on. LSTD
+seeks the w that is **unmoved** by "back up then project," i.e. the fixed point
+v̂<sub>w</sub> = Π T<sup>π</sup>v̂<sub>w</sub>, where the MSPBE is **zero**. Only
+the *in-subspace* part of the Bellman residual is penalized — the component
+orthogonal to span(Φ) is un-fixable by any w, so MSPBE discards it (MSBE keeps
+it, which is why their solutions differ).
+
+*Closed form.* Writing C = 𝔼[φφ<sup>⊤</sup>] for the feature covariance, the
+MSPBE is a quadratic in w:
+
+$$J_{\text{PBE}}(w) = \mathbb{E}[\delta\,\varphi]^\top\, C^{-1}\, \mathbb{E}[\delta\,\varphi] = (b - Aw)^\top C^{-1} (b - Aw),$$
+
+because 𝔼[φδ] = b − Aw with the **same** A and b as above. This is zero exactly
+when Aw = b, i.e. **w = A<sup>−1</sup>b** — so LSTD's closed-form solution *is*
+the MSPBE minimizer. Equivalently: 𝔼[φδ] = 0, the expected TD error is
+orthogonal to every feature.
 
 **LSTDQ / LSPI:** the action-value version (LSTDQ) plugged into policy iteration
 gives **Least-Squares Policy Iteration (LSPI)** — a sample-efficient off-policy
@@ -755,9 +808,41 @@ Gradient-free (black-box) methods optimize policy parameters without computing
 1. **Evolutionary Strategies (ES)** — e.g. CMA-ES, OpenAI's ES: perturb
    parameters with Gaussian noise, evaluate fitness (episode return), and move
    toward higher-return perturbations.
+
+   *Sample* N perturbations and form jittered parameter vectors:
+
+$$\varepsilon_i \sim N(0, I), \qquad \theta_i = \theta + \sigma\varepsilon_i$$
+
+   *Evaluate* the episode return (fitness) R<sub>i</sub> for each θ<sub>i</sub>,
+   then *update* along the return-weighted noise direction:
+
+$$\theta \leftarrow \theta + \alpha\,\frac{1}{N\sigma}\sum_{i=1}^{N} R_i\,\varepsilon_i$$
+
+   where θ are the policy parameters, σ the noise scale, R<sub>i</sub> the episode
+   return (fitness), α the learning rate, and N the number of perturbations.
+   *Idea:* sample random parameter directions and keep moving toward those that
+   achieve higher returns.
+
 2. **Cross-Entropy Method (CEM)** — sample parameter vectors from a distribution,
    keep the top-performing "elite" fraction, refit the distribution to them,
    repeat.
+
+   *Sample* N parameter vectors from a Gaussian search distribution:
+
+$$\theta_i \sim N(\mu, \Sigma), \qquad i = 1, \dots, N$$
+
+   *Evaluate* the return R<sub>i</sub> for each θ<sub>i</sub>, keep the
+   top-performing **elite** samples (the highest fraction ρ by return), then
+   *refit* the distribution to those elites by maximum likelihood:
+
+$$\mu \leftarrow \frac{1}{m}\sum_{\text{elite } i} \theta_i, \qquad \Sigma \leftarrow \frac{1}{m}\sum_{\text{elite } i} (\theta_i - \mu)(\theta_i - \mu)^\top$$
+
+   where μ, Σ are the mean and covariance of the search distribution,
+   θ<sub>i</sub> a sampled parameter vector, R<sub>i</sub> its episode return
+   (fitness), N the number of samples, ρ the **elite fraction**, and m = ρN the
+   number of elites kept. *Idea:* each round, keep only the best samples and
+   re-center (and shrink) the search distribution onto them, so it progressively
+   concentrates around high-return regions.
 
 (Other examples: genetic algorithms, simulated annealing, random/hill-climbing
 search, Augmented Random Search (ARS).)
