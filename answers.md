@@ -1054,33 +1054,34 @@ variance.
 actor-critic method that parallelizes data collection across many CPU workers
 *instead of* using a replay buffer.
 
-- Multiple **worker** threads each have a copy of the policy π<sub>θ</sub>
-  (actor) and value V(s; θ<sub>v</sub>) (critic) and interact with their own
-  environment instance.
-- Each worker runs n-step rollouts, computes the **advantage**
-  Â<sub>t</sub> = Σ γ<sup>i</sup> r<sub>t+i</sub> + γ<sup>n</sup>V(s<sub>t+n</sub>) − V(s<sub>t</sub>),
-  and the gradients:
+- Each **worker** thread keeps thread-local copies of the actor π(a∣s;θ) and
+  critic V(s;w), interacts with its own environment instance, and periodically
+  pushes its accumulated gradients to a shared global network — "Hogwild!"-style
+  lock-free updates — then re-syncs the latest parameters.
+- Decorrelation of the training data comes from **parallel diverse actors**
+  rather than a replay buffer, which is what lets A3C remain on-policy.
 
-$$\nabla_\theta \log \pi_\theta(a_t\mid s_t)\, \hat A_t + \beta\, \nabla_\theta H\big(\pi_\theta(\cdot\mid s_t)\big)$$
+The full per-thread procedure — action selection, the n-step bootstrapped return,
+the advantage, and the accumulated actor/critic gradients — is:
 
-**Reading it term by term.**
+<figure class="diagram">
+  <img src="img/a3c.png" alt="A3C pseudocode, Algorithm S3 (Mnih et al., 2016)">
+  <figcaption>A3C — asynchronous advantage actor-critic, pseudocode for each actor-learner thread (Mnih et al., 2016, Algorithm S3).</figcaption>
+</figure>
 
-- ∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub>∣s<sub>t</sub>) Â<sub>t</sub> — the
-  policy-gradient term, with an **estimated advantage** Â<sub>t</sub> from the
-  n-step rollout and the critic.
-- H(π<sub>θ</sub>(·∣s<sub>t</sub>)) — the **entropy** of the policy at
-  s<sub>t</sub> (how spread-out the action distribution is).
-- β — a small coefficient on the entropy bonus.
-- ∇<sub>θ</sub>H — pushes the policy toward being *more* random.
+The boxed R − V(s<sub>i</sub>;θ'<sub>v</sub>) is the **advantage**: positive when
+the sampled return beats the critic's estimate. The same quantity weights the
+**actor** gradient (dθ) and is the residual the **critic** gradient (dθ<sub>v</sub>)
+drives to zero.
 
-*Intuition:* the first term improves the policy; the second keeps it from
-collapsing to a single deterministic action too soon, preserving exploration. β
-sets how strongly exploration is encouraged.
+**Entropy bonus (omitted from the pseudocode).** To stop the policy collapsing to
+a deterministic action too early, A3C adds a policy-entropy term to the actor's
+dθ accumulation:
 
-  plus a value loss (Â<sub>t</sub>)² for the critic. An **entropy bonus** H
-  encourages exploration.
-- Workers **asynchronously** push gradients to (and pull params from) a shared
-  global network — "Hogwild!"-style lock-free updates.
+$$H(\pi) = -\sum_a \pi(a\mid s)\log \pi(a\mid s),$$
+
+i.e. it adds λ∇<sub>θ</sub>H(π) to dθ, with the coefficient λ setting how strongly
+exploration is encouraged.
 
 **Strengths.** No replay buffer (lower memory); decorrelation of data comes from
 *parallel diverse actors* rather than replay, so it works with **on-policy**

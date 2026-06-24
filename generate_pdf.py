@@ -259,6 +259,9 @@ h3 {
 .eq img.eqimg { max-width: 100%; height: auto; }
 .math img.inlimg { height: 1em; vertical-align: -0.18em; }
 .eqfail { font-family: "DejaVu Sans Mono", monospace; color: #b00020; font-size: 9.5pt; }
+figure.diagram { margin: 14px 0; text-align: center; page-break-inside: avoid; }
+figure.diagram img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 6px; }
+figure.diagram figcaption { margin-top: 6px; font-size: 9.5pt; color: #555; font-style: italic; }
 
 /* Tables: accent header, tinted zebra. */
 table {
