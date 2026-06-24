@@ -1196,14 +1196,14 @@ $$\max_\theta\ \mathbb{E}\Big[ \frac{\pi_\theta}{\pi_{\text{old}}}\, \hat A \Big
 
 *Intuition:* take the largest improvement step you can **without** moving the
 policy more than δ in distribution — the constraint blocks the over-large updates
-that make naive policy gradients collapse. Solved by a natural-gradient direction
-(conjugate gradient on the Fisher matrix) followed by a backtracking line search.
+that make naive policy gradients collapse.
 
-This is solved by a **natural-gradient** step: linearize the objective, take a
-quadratic (Fisher-matrix F) approximation of the KL, giving the search direction
-F⁻¹g computed via **conjugate gradient** (avoiding explicit F⁻¹), then a
-**line search** (backtracking) to enforce the constraint and ensure actual
-improvement.
+The full practical procedure for one iteration is:
+
+<figure class="diagram">
+  <img src="img/trpo.png" alt="TRPO pseudocode, Algorithm 1 (Schulman et al., 2015)">
+  <figcaption>TRPO pseudocode for one iteration (Schulman et al., 2015; OpenAI Spinning Up, Algorithm 1).</figcaption>
+</figure>
 
 **Strengths:** near-monotonic improvement, stable, good for continuous control,
 robust to step-size choice. **Weaknesses:** complex to implement (CG +
